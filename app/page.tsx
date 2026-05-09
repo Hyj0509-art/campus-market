@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/context/LanguageContext";
+import { texts } from "@/lib/i18n";
 
 type ItemType = {
   id: number;
@@ -17,12 +20,39 @@ type ItemType = {
 };
 
 export default function HomePage() {
+  const router = useRouter();
+  const { lang, toggleLang } = useLanguage();
+  const t = texts[lang];
+
   const [items, setItems] = useState<ItemType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState(""); // 搜索关键词
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraUrl = "http://192.168.243.156";
 
   useEffect(() => {
     loadItems();
+  }, []);
+
+  useEffect(() => {
+    const initUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUserEmail(data.user?.email ?? null);
+    };
+    initUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUserEmail(session?.user?.email ?? null);
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const loadItems = async () => {
@@ -33,85 +63,148 @@ export default function HomePage() {
         .order("created_at", { ascending: false });
 
       if (!error && dbItems) {
-        console.log("✅ 从数据库加载了数据", dbItems);
         setItems(dbItems);
       } else {
-        console.log("❌ 加载失败", error);
         setItems([]);
       }
     } catch (err) {
-      console.log("❌ 数据库连接错误", err);
       setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // 过滤搜索结果
   const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("确定要删除吗？")) return;
-
-    try {
-      const { error } = await supabase
-        .from("items")
-        .delete()
-        .eq("id", id);
-
-      if (!error) {
-        alert("✅ 删除成功");
-        // 重新加载数据
-        loadItems();
-      } else {
-        alert("❌ 删除失败");
-      }
-    } catch (err) {
-      alert("❌ 删除出错");
-      console.log(err);
-    }
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.refresh();
   };
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">加载中...</p>
+      <main className="flex min-h-screen items-center justify-center bg-gray-100">
+        <p className="text-gray-500">{t.loading}</p>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-gray-100">
+      <div className="fixed right-6 top-6 z-40 flex flex-wrap items-center justify-end gap-3">
+        <button
+          type="button"
+          onClick={toggleLang}
+          className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-white"
+        >
+          {lang === "zh" ? "EN" : "中文"}
+        </button>
+
+        {userEmail ? (
+          <>
+            <div className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200">
+              {userEmail}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-white"
+            >
+              {t.logout}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-white"
+            >
+              {t.login}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/register")}
+              className="rounded-lg bg-white/90 px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm ring-1 ring-gray-200 hover:bg-white"
+            >
+              {t.register}
+            </button>
+          </>
+        )}
+      </div>
+
+      {cameraOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setCameraOpen(false)}
+        >
+          <div
+            className="relative h-screen w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setCameraOpen(false)}
+              className="absolute left-3 top-3 z-10 rounded-lg bg-white/90 px-3 py-1 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-white"
+            >
+              {t.close}
+            </button>
+
+            <iframe
+              title={t.camera}
+              src={cameraUrl}
+              className="h-full w-full"
+              style={{ border: "none" }}
+            />
+          </div>
+        </div>
+      )}
+
       <section className="bg-green-600 px-6 py-16 text-white">
         <div className="mx-auto max-w-6xl">
-          <h1 className="mb-4 text-4xl font-bold">校园二手交易平台</h1>
-          <p className="mb-6 text-lg text-green-50">
-            在校园里轻松发布、查找和交易闲置物品
-          </p>
-          <div className="flex gap-4">
+          <h1 className="mb-4 text-4xl font-bold">{t.title}</h1>
+          <p className="mb-6 text-lg text-green-50">{t.subtitle}</p>
+
+          <div className="flex flex-wrap gap-4">
             <Link
               href="/sell"
               className="rounded-xl bg-white px-6 py-3 font-semibold text-green-600 shadow hover:bg-gray-100"
             >
-              发布物品
+              {t.sell}
             </Link>
+
             <Link
               href="/my-items"
+              className="rounded-xl bg-green-700 px-6 py-3 font-semibold text-white shadow hover:bg-green-800"
+            >
+              {t.myItems}
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setCameraOpen(true)}
               className="rounded-xl border border-white px-6 py-3 font-semibold text-white hover:bg-green-700"
             >
-              我的发布
+              {t.camera}
+            </button>
+
+            <Link
+              href="/notices/camera-box"
+              className="rounded-xl border border-white px-6 py-3 font-semibold text-white hover:bg-green-700"
+            >
+              notices
             </Link>
           </div>
         </div>
       </section>
 
-      {/* 搜索框 */}
       <section className="mx-auto max-w-6xl px-6 py-6">
         <input
           type="text"
-          placeholder="搜索物品名称..."
+          placeholder={t.searchPlaceholder}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-800 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
@@ -120,13 +213,15 @@ export default function HomePage() {
 
       <section className="mx-auto max-w-6xl px-6 py-10">
         <h2 className="mb-6 text-2xl font-bold text-gray-800">
-          {searchQuery ? `搜索结果 (${filteredItems.length})` : "最新物品"}
+          {searchQuery
+            ? `${t.searchResults} (${filteredItems.length})`
+            : t.latestItems}
         </h2>
 
         {filteredItems.length === 0 ? (
           <div className="rounded-2xl bg-white p-10 text-center shadow">
             <p className="text-gray-500">
-              {searchQuery ? "没有找到匹配的物品" : "暂无物品"}
+              {searchQuery ? t.noMatch : t.noItems}
             </p>
           </div>
         ) : (
@@ -150,10 +245,16 @@ export default function HomePage() {
                       className={`rounded-full px-3 py-1 text-xs font-medium ${
                         item.type === "出售"
                           ? "bg-orange-100 text-orange-600"
-                          : "bg-blue-100 text-blue-600"
+                          : item.type === "借用"
+                          ? "bg-blue-100 text-blue-600"
+                          : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      {item.type}
+                      {item.type === "出售"
+                        ? t.sellType
+                        : item.type === "借用"
+                        ? t.borrowType
+                        : item.type}
                     </span>
                   </div>
 
@@ -164,7 +265,7 @@ export default function HomePage() {
                   </Link>
 
                   <p className="mb-4 line-clamp-2 text-sm text-gray-500">
-                    {item.description || "暂无描述"}
+                    {item.description || t.noDescription}
                   </p>
 
                   <div className="flex items-center justify-between">

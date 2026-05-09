@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/context/LanguageContext";
+import { texts } from "@/lib/i18n";
 
 type ItemType = {
   id: number;
@@ -19,6 +21,9 @@ export default function EditItemPage() {
   const params = useParams();
   const router = useRouter();
   const id = Number(params?.id);
+
+  const { lang } = useLanguage();
+  const t = texts[lang];
 
   const [form, setForm] = useState<ItemType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,12 +43,12 @@ export default function EditItemPage() {
           setForm(data);
         } else {
           console.log("❌ 物品不存在");
-          alert("没有找到这个商品");
+          alert(t.itemNotFoundAlert);
           router.push("/my-items");
         }
       } catch (err) {
         console.log("❌ 查询错误:", err);
-        alert("加载商品失败");
+        alert(t.loadItemFailed);
         router.push("/my-items");
       } finally {
         setLoading(false);
@@ -53,7 +58,7 @@ export default function EditItemPage() {
     if (id) {
       loadItem();
     }
-  }, [id, router]);
+  }, [id, router, t.itemNotFoundAlert, t.loadItemFailed]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -86,14 +91,14 @@ export default function EditItemPage() {
         .eq("id", id);
 
       if (!error) {
-        alert("✅ 修改成功");
+        alert(t.updateSuccess);
         router.push("/my-items");
       } else {
-        alert("❌ 修改失败");
+        alert(t.updateFailed);
         console.log(error);
       }
     } catch (err) {
-      alert("❌ 修改出错");
+      alert(t.updateError);
       console.log(err);
     } finally {
       setSaving(false);
@@ -104,7 +109,7 @@ export default function EditItemPage() {
     return (
       <main className="min-h-screen bg-gray-100 px-6 py-10">
         <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 shadow">
-          <p className="text-gray-500">加载中...</p>
+          <p className="text-gray-500">{t.loading}</p>
         </div>
       </main>
     );
@@ -114,7 +119,7 @@ export default function EditItemPage() {
     return (
       <main className="min-h-screen bg-gray-100 px-6 py-10">
         <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 shadow">
-          <p className="text-gray-500">物品不存在</p>
+          <p className="text-gray-500">{t.itemNotExist}</p>
         </div>
       </main>
     );
@@ -123,13 +128,13 @@ export default function EditItemPage() {
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-10">
       <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 shadow">
-        <h1 className="mb-2 text-3xl font-bold text-gray-800">编辑商品</h1>
-        <p className="mb-8 text-gray-500">修改你之前发布的内容</p>
+        <h1 className="mb-2 text-3xl font-bold text-gray-800">{t.editItem}</h1>
+        <p className="mb-8 text-gray-500">{t.editItemDesc}</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              商品标题
+              {t.productTitle}
             </label>
             <input
               type="text"
@@ -143,7 +148,7 @@ export default function EditItemPage() {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              商品描述
+              {t.productDescription}
             </label>
             <textarea
               name="description"
@@ -157,7 +162,7 @@ export default function EditItemPage() {
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                价格
+                {t.priceLabel}
               </label>
               <input
                 type="text"
@@ -171,7 +176,7 @@ export default function EditItemPage() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                类型
+                {t.typeLabel}
               </label>
               <select
                 name="type"
@@ -179,15 +184,15 @@ export default function EditItemPage() {
                 onChange={handleChange}
                 className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-green-500"
               >
-                <option value="出售">出售</option>
-                <option value="借用">借用</option>
+                <option value="出售">{t.sellType}</option>
+                <option value="借用">{t.borrowType}</option>
               </select>
             </div>
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              图片链接
+              {t.imageLink}
             </label>
             <input
               type="text"
@@ -202,7 +207,7 @@ export default function EditItemPage() {
           <div className="grid gap-6 sm:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                卖家昵称
+                {t.sellerNickname}
               </label>
               <input
                 type="text"
@@ -215,7 +220,7 @@ export default function EditItemPage() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                联系方式
+                {t.contactLabel}
               </label>
               <input
                 type="text"
@@ -233,7 +238,7 @@ export default function EditItemPage() {
               disabled={saving}
               className="rounded-xl bg-green-600 px-6 py-3 font-medium text-white hover:bg-green-700 disabled:opacity-50"
             >
-              {saving ? "保存中..." : "保存修改"}
+              {saving ? t.saving : t.saveChanges}
             </button>
 
             <button
@@ -241,7 +246,7 @@ export default function EditItemPage() {
               onClick={() => router.push("/my-items")}
               className="rounded-xl bg-gray-200 px-6 py-3 font-medium text-gray-700 hover:bg-gray-300"
             >
-              取消
+              {t.cancel}
             </button>
           </div>
         </form>

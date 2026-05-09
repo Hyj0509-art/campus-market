@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/context/LanguageContext";
+import { texts } from "@/lib/i18n";
 
 type ItemType = {
   id: number;
@@ -13,11 +15,14 @@ type ItemType = {
   image: string;
   seller?: string;
   contact?: string;
+  user_id?: string; // ✅ 新增
 };
 
 export default function MyItemsPage() {
   const [items, setItems] = useState<ItemType[]>([]);
   const [loading, setLoading] = useState(true);
+  const { lang } = useLanguage();
+  const t = texts[lang];
 
   useEffect(() => {
     loadItems();
@@ -25,9 +30,20 @@ export default function MyItemsPage() {
 
   const loadItems = async () => {
     try {
+      // ✅ 新增：获取当前登录用户
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("请先登录");
+        window.location.href = "/login";
+        return;
+      }
+
+      // ✅ 修改：只查询属于当前用户的物品
       const { data: dbItems, error } = await supabase
         .from("items")
         .select("*")
+        .eq("user_id", user.id) // ✅ 核心改动
         .order("created_at", { ascending: false });
 
       if (!error && dbItems) {
@@ -44,30 +60,28 @@ export default function MyItemsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("确定要删除吗？")) return;
+    if (!window.confirm(t.confirmDelete)) return;
 
     try {
-      const { error } = await supabase
-        .from("items")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("items").delete().eq("id", id);
 
       if (!error) {
-        alert("✅ 删除成功");
-        loadItems(); // 重新加载
+        alert(t.deleteSuccess);
+        loadItems();
       } else {
-        alert("❌ 删除失败");
+        alert(t.deleteFailed);
       }
     } catch (err) {
-      alert("❌ 删除出错");
+      alert(t.deleteError);
       console.log(err);
     }
   };
 
+  // 其余 JSX 完全不变
   if (loading) {
     return (
       <main className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">加载中...</p>
+        <p className="text-gray-500">{t.loading}</p>
       </main>
     );
   }
@@ -77,22 +91,21 @@ export default function MyItemsPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">我的发布</h1>
-            <p className="mt-2 text-gray-500">查看、编辑、删除你发布的物品</p>
+            <h1 className="text-3xl font-bold text-gray-800">{t.myPosts}</h1>
+            <p className="mt-2 text-gray-500">{t.myPostsDesc}</p>
           </div>
-
           <div className="flex gap-3">
             <Link
               href="/"
               className="rounded-xl bg-white px-5 py-3 text-gray-700 shadow hover:bg-gray-50"
             >
-              返回首页
+              {t.backHome}
             </Link>
             <Link
               href="/sell"
               className="rounded-xl bg-green-600 px-5 py-3 font-medium text-white hover:bg-green-700"
             >
-              继续发布
+              {t.continuePosting}
             </Link>
           </div>
         </div>
@@ -100,14 +113,14 @@ export default function MyItemsPage() {
         {items.length === 0 ? (
           <div className="rounded-2xl bg-white p-10 text-center shadow">
             <h2 className="mb-3 text-xl font-semibold text-gray-700">
-              你还没有发布任何物品
+              {t.noItemsPosted}
             </h2>
-            <p className="mb-6 text-gray-500">先去发布一个商品试试吧</p>
+            <p className="mb-6 text-gray-500">{t.noItemsPostedDesc}</p>
             <Link
               href="/sell"
               className="rounded-xl bg-green-600 px-6 py-3 text-white hover:bg-green-700"
             >
-              去发布
+              {t.goPost}
             </Link>
           </div>
         ) : (
@@ -124,7 +137,6 @@ export default function MyItemsPage() {
                     className="h-48 w-full object-cover"
                   />
                 </Link>
-
                 <div className="p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <span
@@ -134,36 +146,32 @@ export default function MyItemsPage() {
                           : "bg-blue-100 text-blue-600"
                       }`}
                     >
-                      {item.type}
+                      {item.type === "出售" ? t.sellType : t.borrowType}
                     </span>
                   </div>
-
                   <Link href={`/items/${item.id}`}>
                     <h3 className="mb-2 text-lg font-semibold text-gray-800 hover:text-green-600">
                       {item.title}
                     </h3>
                   </Link>
-
                   <p className="mb-3 line-clamp-2 text-sm text-gray-500">
-                    {item.description || "暂无描述"}
+                    {item.description || t.noDescription}
                   </p>
-
                   <div className="mb-4 text-lg font-bold text-green-600">
                     {item.price}
                   </div>
-
                   <div className="flex gap-2">
                     <Link
                       href={`/edit/${item.id}`}
                       className="flex-1 rounded-lg bg-blue-500 px-4 py-2 text-center text-white hover:bg-blue-600"
                     >
-                      编辑
+                      {t.edit}
                     </Link>
                     <button
                       onClick={() => handleDelete(item.id)}
                       className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-white hover:bg-red-600"
                     >
-                      删除
+                      {t.delete}
                     </button>
                   </div>
                 </div>
